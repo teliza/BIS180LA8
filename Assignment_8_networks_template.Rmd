@@ -1,0 +1,249 @@
+---
+title: "Assignment 8"
+output: html_document
+---
+
+__Student Name:__ Eliza Tsang
+__Student ID:__ 999606858
+
+## Assignment 8: Gene Networks 2
+
+```{r}
+cities <- read.table("../Assignment_8_Tsang.Eliza/us_cities.txt", sep = "\t", header = TRUE)
+rownames(cities) <- cities$X #make first column the rownames
+cities <- cities[,-1] #remove first column
+cities <- as.matrix(cities) #convert to matrix
+cities
+```
+
+*Cities with distances greater than 1500 miles between them would no longer be reachable directly. Their edge value would become a zero. Likewise, if two cities are within 1500 miles, their edge value would become 1. This 1 or 0 representation of the network is called the network adjacency matrix.*
+
+```{r}
+cities_mat <- cities < 1500 # leave original matrix intact
+diag(cities_mat) <- 0 # do not have to fly within each of cities 
+cities_mat # check out adjacency matrix
+```
+```
+|BOS| 3|
+|NY|4|
+|DC|4|
+|MIA|3|
+|CHI|5|
+|SEA|3|
+|SF|3|
+|LA|3|
+|DEN|4|
+```
+
+**Exercise 1:**
+
+**Based on this 0 or 1 representation of our network, what city is the most highly connected?** *Hint: sum the values down a column OR across a row for each city*
+
+Chicago has a total value of 5, making it the most highly connected based on this representation.
+
+**What if you were to extend the range to 2000 miles in the above code. Does the highest connected city change? If so explain.**
+
+```{r}
+cities_mat2 <- cities < 2000 
+diag(cities_mat2) <- 0 
+cities_mat2 
+```
+
+```
+|BOS| 5|
+|NY|5|
+|DC|5|
+|MIA|4|
+|CHI|5|
+|SEA|3|
+|SF|3|
+|LA|3|
+|DEN|7|
+```
+
+Yes, now Denver has the most connections with 7. (Also, BOS, NY, DC, and MIA have also increased in the number of connections) Denver, which had places over 1500 miles away, have many within 2000 miles. Because the maximum mileage has been increased to 2000, Denver became the most connected city based on these guidelines. (It also affected other cities as more connections were available there too.)
+
+**Exercise 2:**
+
+```{r}
+library(igraph) 
+cities_graph2 <- graph.adjacency(cities_mat2, mode = "undirected")
+plot.igraph(cities_graph2)
+
+sum(cities_mat2)/2 # divide by 2 because the matrix has 2 values for each edge
+```
+**What is the total number of nodes in the plot?** 9
+**What is the total number of edges in the plot?** 20
+
+**Exercise 3:**
+**Re-calculate the adjacency matrix with the cutoff value at 2300. Calculate the number of edges using the following code. What do you get?**
+
+```{r}
+cities_mat3 <- cities < 2300 
+diag(cities_mat3) <- 0 
+cities_mat3
+
+sum(cities_mat3)/2 # divide by 2 because the matrix has 2 values for each edge
+```
+
+It calculated 24 edges.
+
+**Exercise 4:**
+
+**(Gene1)–(+0.9)–(Gene2)**
+
+**(Gene2)–(-0.76)–(Gene3)**
+
+**(Gene1)–(+0.50)–(Gene3)**
+
+**(Gene3)–(-0.69)–(Gene4)**
+
+**Fill in the following 0 or 1 values for our gene network above.**
+
+(Gene1)--(1)--(Gene2)
+
+(Gene2)--(1)--(Gene3)
+
+(Gene1)--(0)--(Gene3)
+
+(Gene3)--(0)--(Gene4)
+
+**Exercise 5:**
+
+```{r}
+genes <- read.table("voom_transform_brassica.csv", sep = ",", header = TRUE)
+genes <- genes[,-c(38,42,46)] # remove questionable library columns
+DE_genes <- read.table("DEgenes_GxE.csv", sep = ",")
+DE_gene_names <- rownames(DE_genes)
+GxE_counts <- as.data.frame(genes[DE_gene_names,])
+genes_cor <- cor(t(GxE_counts)) # calculate the correlation between all gene pairs
+```
+
+**a) Create an adjacency matrix called `genes_adj85` for the genes use a cutoff of abs(correlation) > 0.85.  Remember to set the diagonal of the adjacency matrix to 0.  Create a second adjacency matrix `genes_adj95` using a cutoff of abs(correlation) > 0.95. See above code for cities.**
+
+```{r}
+genes_adj85 <- abs(genes_cor) > 0.85
+diag(genes_adj85) <- 0 
+head(genes_adj85)
+```
+
+```{r}
+genes_adj95 <- abs(genes_cor) > 0.95
+diag(genes_adj95) <- 0 
+head(genes_adj95)
+```
+
+**b) Now we can do some calculations. If our cutoff is 0.85, how many edges do we have in our 255 node network? What if we increase our cutoff to 0.95?**
+
+```{r}
+sum(genes_adj85)/2
+sum(genes_adj95)/2
+```
+
+At 0.85 cutoff, we have 525 edges.
+At 0.95 cutoff, we have 9 edges. 
+
+Our cutoff was stricter at 0.95 (the correlation had to have an absolute value of 0.95 or above), so there are fewer edges considered. 
+
+**Exercise 6:**
+**Use the following code to plot our networks using different thresholds for connectivity. What patterns do you see in the visualization of this data?** *Note: the second plot will take a while to render*
+
+```{r}
+gene_graph95 <- graph.adjacency(genes_adj95, mode = "undirected") #convert adjacency to graph
+comps <- clusters(gene_graph95)$membership                        #define gene cluster membership
+colbar <- rainbow(max(comps)+1)                                   #define colors
+V(gene_graph95)$color <- colbar[comps+1]                          #assign colors to nodes
+plot(gene_graph95, layout = layout.fruchterman.reingold, vertex.size = 6, vertex.label = NA)
+```
+
+```{r}
+#this one will take a little while to render
+gene_graph85 <- graph.adjacency(genes_adj85, mode = "undirected")
+comps <- clusters(gene_graph85)$membership
+colbar <- rainbow(max(comps)+1)
+V(gene_graph85)$color <- colbar[comps+1]
+plot(gene_graph85, layout=layout.fruchterman.reingold, vertex.size=6, vertex.label=NA)
+```
+
+For 0.85, the red nodes are more grouped together with many edges between them.
+For the 0.95 chart, there doesn't seem to be a visible pattern (save for a few blue dots in the lower left quadrant, those may be the nodes with the 9 edges); all the nodes seem to be more or less evenly distributed.
+
+**Exercise 7:**
+Use the following code to answer these two questions: In gene_graph85, what is the total graph density? In gene_graph85, what is the average path length? 
+
+```{r}
+graph.density(gene_graph85)
+average.path.length(gene_graph85)
+```
+The density of gene_graph85 is 0.01621121, and the average path length is 3.663435.
+
+```{r}
+gene_graph85 <- graph.adjacency(genes_adj85, mode = "undirected")
+distMatrix <- shortest.paths(gene_graph85, v = V(gene_graph85), to = V(gene_graph85))
+head(distMatrix)[,1:7]
+```
+*We are interested in visualizing the path between Bra033034 (row number 2) and Bra009406 (column number 7). This is where the 2 and 7 arguments come from in get.shortest.paths()*
+
+```{r}
+pl <- get.shortest.paths(gene_graph85, 2, 7)$vpath[[1]] # pull paths between node 2 and 7
+
+V(gene_graph85)[pl]$color <- paste("green")          # define node color
+E(gene_graph85)$color <- paste("grey")               # define default edge color
+E(gene_graph85, path = pl)$color <- paste("blue")    # define edge color
+E(gene_graph85, path = pl)$width <- 10               # define edge width
+plot(gene_graph85, layout = layout.fruchterman.reingold, vertex.size = 6, vertex.label = NA)
+```
+
+**Exercise 8: Using what you know about graphs, repeat your analysis of the smaller cities matrix. Show your code to answer these questions.**
+
+**What is the graph density of the cities network with a 1500 mile flight range? What is the average path length of the cities network with a 1500 mile flight range?**
+
+```{r}
+cities_mat1500 <- graph.adjacency(cities_mat, mode = "undirected")
+comps <- clusters(cities_mat1500)$membership
+colbar <- rainbow(max(comps)+1)
+V(cities_mat1500)$color <- colbar[comps+1]
+plot(cities_mat1500, layout=layout.fruchterman.reingold, vertex.size=6, vertex.label=NA)
+graph.density(cities_mat1500)
+average.path.length(cities_mat1500)
+```
+
+The graph density of the 1500 mile flight range is 0.4444444 and the average path length is 1.888889.
+
+**Find the shortest path between SEA and DC with 1500 mile flight range. Graph it.**
+
+```{r}
+head(cities_mat)
+SEA_DC_1500 <- get.shortest.paths(cities_mat1500, 3,6 )$vpath[[1]] 
+
+V(cities_mat1500)[SEA_DC_1500]$color <- paste("green")          # define node color
+E(cities_mat1500)$color <- paste("grey")               # define default edge color
+E(cities_mat1500, path = SEA_DC_1500)$color <- paste("blue")    # define edge color
+E(cities_mat1500, path = SEA_DC_1500)$width <- 10               # define edge width
+plot(cities_mat1500, layout = layout.fruchterman.reingold, vertex.size = 6, vertex.label = NA)
+```
+
+The shortest path is across 5 nodes and 4 edges.
+
+**Find the shortest path between SEA and DC with 2300 mile flight range. Graph it.**
+
+```{r}
+cities_mat2300 <- graph.adjacency(cities_mat3, mode = "undirected")
+comps <- clusters(cities_mat2300)$membership
+colbar <- rainbow(max(comps)+1)
+V(cities_mat2300)$color <- colbar[comps+1]
+plot(cities_mat2300, layout=layout.fruchterman.reingold, vertex.size=6, vertex.label=NA)
+```
+
+```{r}
+head(cities_mat3)
+SEA_DC_2300 <- get.shortest.paths(cities_mat2300, 3, 6)$vpath[[1]] 
+
+V(cities_mat2300)[SEA_DC_2300]$color <- paste("green")          
+E(cities_mat2300)$color <- paste("grey")               
+E(cities_mat2300, path = SEA_DC_2300)$color <- paste("blue")    
+E(cities_mat2300, path = SEA_DC_2300)$width <- 10               
+plot(cities_mat2300, layout = layout.fruchterman.reingold, vertex.size = 6, vertex.label = NA)
+```
+
+Since the 2300 mile threshold is greater than 1500, there are fewer nodes and edges needed to find the shortest path.
